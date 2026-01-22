@@ -10,8 +10,7 @@ class MusicalDSLServer < Sinatra::Base
   set :bind, "0.0.0.0"
   set :port, 4567
 
-  before do
-    use Rack::Cors do
+  use Rack::Cors do
     allow do
       origins '*' # Em produção final, troque pelo link da Vercel
       resource '*',
@@ -20,7 +19,7 @@ class MusicalDSLServer < Sinatra::Base
         max_age: 86400
     end
   end
-
+  
   post "/run" do
     code = request.body.read
     MusicalDSL::LOGGER.info("[SERVER:POST /run] Received #{code.length} bytes of code")
