@@ -7,10 +7,11 @@ require_relative "lib/musical_dsl"
 
 
 class MusicalDSLServer < Sinatra::Base
+  disable :protection
+  
   set :bind, "0.0.0.0"
   set :port, 4567
-  set :protection, false
-
+  
   use Rack::Cors do
     allow do
       origins '*' # Mantenha '*' por enquanto para testes entre localhost e Railway
