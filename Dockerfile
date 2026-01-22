@@ -24,4 +24,4 @@ COPY . .
 
 EXPOSE 4567
 
-CMD ["bundle", "exec", "ruby", "server.rb"]
+CMD ["bundle", "exec", "puma", "-p", "4567"]
