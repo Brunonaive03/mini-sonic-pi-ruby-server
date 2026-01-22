@@ -6,6 +6,13 @@ require "rack/cors"
 require_relative "lib/musical_dsl"
 
 class MusicalDSLServer < Sinatra::Base
+
+  permitted_hosts: [
+      "mini-sonic-pi-ruby-server-production.up.railway.app",
+      "localhost",
+      "127.0.0.1"
+  ]
+
   ########################################
   # Configurações básicas
   ########################################
