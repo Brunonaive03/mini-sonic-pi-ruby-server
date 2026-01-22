@@ -1,0 +1,17 @@
+#!/usr/bin/env ruby
+
+require "json"
+require_relative "../lib/musical_dsl"
+
+if ARGV.empty?
+  puts "Usage: musical_dsl <file.dsl.rb>"
+  exit 1
+end
+
+file = ARGV.first
+code = File.read(file)
+
+parser = MusicalDSL::Parser.new
+events = parser.run(code)
+
+puts JSON.pretty_generate(events)
