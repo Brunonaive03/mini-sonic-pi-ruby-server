@@ -6,12 +6,14 @@ require "rack/cors"
 require_relative "lib/musical_dsl"
 
 class MusicalDSLServer < Sinatra::Base
+  ########################################
   # Configurações básicas
+  ########################################
   set :bind, "0.0.0.0"
   set :port, ENV["PORT"] || 4567
 
   ########################################
-  # CORS — obrigatório para produção
+  # CORS — produção / Railway
   ########################################
   use Rack::Cors do
     allow do
@@ -24,7 +26,7 @@ class MusicalDSLServer < Sinatra::Base
     end
   end
 
-  # Preflight explícito (Railway / browsers)
+  # Preflight explícito (necessário em proxy reverso)
   options "*" do
     response.headers["Access-Control-Allow-Origin"] = "*"
     response.headers["Access-Control-Allow-Methods"] = "GET, POST, OPTIONS"
@@ -37,38 +39,39 @@ class MusicalDSLServer < Sinatra::Base
   ########################################
   post "/run" do
     code = request.body.read
-    MusicalDSL::LOGGER.info("[SERVER:POST /run] Received #{code.length} bytes of code")
+
+    MusicalDSL::LOGGER.info(
+      "[SERVER] POST /run (#{code ? code.bytesize : 0} bytes)"
+    )
 
     if code.nil? || code.strip.empty?
-      MusicalDSL::LOGGER.warn("[SERVER:POST /run] Code was empty")
       status 400
       content_type :json
       return { error: "Código DSL vazio" }.to_json
     end
 
-    MusicalDSL::LOGGER.debug("[SERVER:POST /run] Code:\n#{code}")
-
     runtime = MusicalDSL::Runtime.new
     runtime_id = MusicalDSL::Runtime.register(runtime)
 
-    MusicalDSL::LOGGER.info("[SERVER:POST /run] Runtime registered (id=#{runtime_id})")
+    MusicalDSL::LOGGER.info(
+      "[SERVER] Runtime registrado (id=#{runtime_id})"
+    )
 
+    # Execução ASSÍNCRONA da DSL (NUNCA bloqueie o servidor HTTP)
     Thread.new do
-      runtime.start(code)
+      begin
+        runtime.start(code)
+      rescue => e
+        MusicalDSL::LOGGER.error(
+          "[RUNTIME #{runtime_id}] #{e.class}: #{e.message}"
+        )
+        MusicalDSL::LOGGER.debug(e.backtrace.join("\n"))
+      end
     end
-
-    MusicalDSL::LOGGER.info("[SERVER:POST /run] Runtime started")
 
     status 202
     content_type :json
     { runtime_id: runtime_id }.to_json
-
-  rescue => e
-    MusicalDSL::LOGGER.error("[SERVER:POST /run:ERROR] #{e.class}: #{e.message}")
-    MusicalDSL::LOGGER.debug("[SERVER:POST /run:ERROR]\n#{e.backtrace.join("\n")}")
-    status 500
-    content_type :json
-    { error: "internal", message: e.message }.to_json
   end
 
   ########################################
@@ -79,13 +82,17 @@ class MusicalDSLServer < Sinatra::Base
       payload = request.body.read
       data = payload && !payload.strip.empty? ? JSON.parse(payload) : {}
     rescue JSON::ParserError => e
-      MusicalDSL::LOGGER.warn("[SERVER:POST /stop] JSON parse error: #{e.message}")
+      MusicalDSL::LOGGER.warn(
+        "[SERVER] POST /stop JSON inválido: #{e.message}"
+      )
       data = {}
     end
 
     runtime_id = data["runtime_id"] || params["runtime_id"]
 
-    MusicalDSL::LOGGER.info("[SERVER:POST /stop] Stop requested for runtime_id=#{runtime_id}")
+    MusicalDSL::LOGGER.info(
+      "[SERVER] POST /stop (runtime_id=#{runtime_id})"
+    )
 
     unless runtime_id
       status 400
@@ -98,16 +105,24 @@ class MusicalDSLServer < Sinatra::Base
     unless runtime
       status 404
       content_type :json
-      return { error: "runtime not found", runtime_id: runtime_id }.to_json
+      return {
+        error: "runtime not found",
+        runtime_id: runtime_id
+      }.to_json
     end
 
     runtime.stop
     MusicalDSL::Runtime.unregister(runtime_id.to_i)
 
-    MusicalDSL::LOGGER.info("[SERVER:POST /stop] Runtime stopped (id=#{runtime_id})")
+    MusicalDSL::LOGGER.info(
+      "[SERVER] Runtime encerrado (id=#{runtime_id})"
+    )
 
     content_type :json
-    { status: "stopped", runtime_id: runtime_id.to_i }.to_json
+    {
+      status: "stopped",
+      runtime_id: runtime_id.to_i
+    }.to_json
   end
 
   ########################################
@@ -118,7 +133,7 @@ class MusicalDSLServer < Sinatra::Base
     since_id  = params["since_id"] ? params["since_id"].to_i : 0
 
     MusicalDSL::LOGGER.debug(
-      "[SERVER:GET /events] runtime_id=#{runtime_id} since_id=#{since_id}"
+      "[SERVER] GET /events runtime_id=#{runtime_id} since_id=#{since_id}"
     )
 
     unless runtime_id
@@ -132,15 +147,14 @@ class MusicalDSLServer < Sinatra::Base
     unless runtime
       status 404
       content_type :json
-      return { error: "runtime not found", runtime_id: runtime_id }.to_json
+      return {
+        error: "runtime not found",
+        runtime_id: runtime_id
+      }.to_json
     end
 
     events = runtime.events_since(since_id)
     alive  = runtime.alive?
-
-    MusicalDSL::LOGGER.debug(
-      "[SERVER:GET /events] Returning #{events.length} events (alive=#{alive})"
-    )
 
     content_type :json
     {
@@ -149,14 +163,14 @@ class MusicalDSLServer < Sinatra::Base
       last_id: events.empty? ? since_id : events.last["id"],
       alive: alive
     }.to_json
-
   rescue => e
-    MusicalDSL::LOGGER.error("[SERVER:GET /events:ERROR] #{e.class}: #{e.message}")
+    MusicalDSL::LOGGER.error(
+      "[SERVER] GET /events ERROR: #{e.class}: #{e.message}"
+    )
     status 500
     content_type :json
     { error: "internal", message: e.message }.to_json
   end
 end
 
-MusicalDSL::LOGGER.info("[BOOT] MusicalDSLServer starting")
-MusicalDSLServer.run! if __FILE__ == $0
+MusicalDSL::LOGGER.info("[BOOT] MusicalDSLServer loaded (Rack mode)")
