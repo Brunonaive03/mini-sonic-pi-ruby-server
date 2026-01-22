@@ -53,7 +53,9 @@ class MusicalDSLServer < Sinatra::Base
 
     MusicalDSL::LOGGER.info("[SERVER:POST /run] Runtime registered (id=#{runtime_id})")
 
-    runtime.start(code)
+    Thread.new do
+      runtime.start(code)
+    end
 
     MusicalDSL::LOGGER.info("[SERVER:POST /run] Runtime started")
 
