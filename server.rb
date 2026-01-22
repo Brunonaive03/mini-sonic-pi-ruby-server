@@ -2,7 +2,7 @@ $stdout.sync = true
 
 require "sinatra/base"
 require "json"
-
+require "rack/cors"
 require_relative "lib/musical_dsl"
 
 
@@ -11,22 +11,16 @@ class MusicalDSLServer < Sinatra::Base
   set :port, 4567
 
   before do
-    # CORS headers for all responses (including errors)
-    headers(
-      "Access-Control-Allow-Origin" => "*",
-      "Access-Control-Allow-Methods" => "GET, POST, OPTIONS",
-      "Access-Control-Allow-Headers" => "Content-Type",
-      "Access-Control-Max-Age" => "86400"
-    )
-    MusicalDSL::LOGGER.info("[SERVER] → #{request.request_method} #{request.path}")
+    use Rack::Cors do
+    allow do
+      origins '*' # Em produção final, troque pelo link da Vercel
+      resource '*',
+        headers: :any,
+        methods: [:get, :post, :options],
+        max_age: 86400
+    end
   end
 
-  options "*" do
-    200
-  end
-
-  # POST /run
-  # body: text/plain (DSL)
   post "/run" do
     code = request.body.read
     MusicalDSL::LOGGER.info("[SERVER:POST /run] Received #{code.length} bytes of code")
