@@ -130,4 +130,4 @@ class MusicalDSLServer < Sinatra::Base
 end
 
 MusicalDSL::LOGGER.info("[BOOT] MusicalDSLServer starting on 0.0.0.0:4567")
-Rack::Handler::Puma.run MusicalDSLServer, Port: port, Host: '0.0.0.0'
+MusicalDSLServer.run! if __FILE__ == $0
