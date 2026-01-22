@@ -9,17 +9,19 @@ require_relative "lib/musical_dsl"
 class MusicalDSLServer < Sinatra::Base
   set :bind, "0.0.0.0"
   set :port, 4567
+  set :protection, false
 
   use Rack::Cors do
     allow do
-      origins '*' # Em produção final, troque pelo link da Vercel
+      origins '*' # Mantenha '*' por enquanto para testes entre localhost e Railway
       resource '*',
         headers: :any,
         methods: [:get, :post, :options],
-        max_age: 86400
+        expose: ['Content-Type', 'Authorization'], # Exponha headers se necessário
+        max_age: 600
     end
   end
-  
+
   post "/run" do
     code = request.body.read
     MusicalDSL::LOGGER.info("[SERVER:POST /run] Received #{code.length} bytes of code")
