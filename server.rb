@@ -10,7 +10,7 @@ class MusicalDSLServer < Sinatra::Base
   disable :protection
   
   set :bind, "0.0.0.0"
-  set :port, 4567
+  set :port, ENV['PORT'] || 4567
   
   use Rack::Cors do
     allow do
